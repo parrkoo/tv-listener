@@ -1,4 +1,4 @@
-name: Build debug APK (JDK 17 + Gradle 7.4.2)
+name: Build debug APK (JDK 17 + Gradle 7.5.1)
 
 on:
   push:
@@ -9,8 +9,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      GRADLE_VERSION: "7.4.2"
-      GRADLE_DIST_URL: "https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"
+      GRADLE_VERSION: "7.5.1"
+      GRADLE_DIST_URL: "https://services.gradle.org/distributions/gradle-7.5.1-bin.zip"
 
     steps:
       - name: Checkout repo
@@ -23,12 +23,12 @@ jobs:
           java-version: '17'
 
       - name: Download and unpack Gradle ${GRADLE_VERSION}
+        shell: bash
         run: |
           mkdir -p $HOME/gradle
           curl -sSL "${{ env.GRADLE_DIST_URL }}" -o gradle.zip
           unzip -q gradle.zip -d $HOME/gradle
           rm gradle.zip
-          # set GRADLE_BIN to the installed gradle binary path
           GRADLE_BIN=$(ls -d $HOME/gradle/gradle-* | head -n1)/bin/gradle
           echo "GRADLE_BIN=$GRADLE_BIN" >> $GITHUB_ENV
           $GRADLE_BIN --version
@@ -47,11 +47,12 @@ jobs:
             chmod +x ./gradlew
             echo "GRADLE_CMD=./gradlew" >> $GITHUB_ENV
           else
-            echo "No gradlew found — using downloaded Gradle"
-            echo "GRADLE_CMD=${GRADLE_BIN}" >> $GITHUB_ENV
+            echo "Using downloaded Gradle at $GRADLE_BIN"
+            echo "GRADLE_CMD=$GRADLE_BIN" >> $GITHUB_ENV
           fi
 
       - name: Show java / gradle info
+        shell: bash
         run: |
           echo "JAVA_HOME=$JAVA_HOME"
           java -version
@@ -59,6 +60,7 @@ jobs:
           $GRADLE_CMD --version
 
       - name: Build debug APK
+        shell: bash
         run: |
           set -o pipefail
           $GRADLE_CMD clean assembleDebug --no-daemon --stacktrace
