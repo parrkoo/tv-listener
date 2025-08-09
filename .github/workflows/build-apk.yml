@@ -1,10 +1,4 @@
-- name: Strip BOMs from gradle and properties files
-  shell: bash
-  run: |
-    find . -type f \( -name '*.gradle' -o -name '*.properties' \) -print0 \
-    | xargs -0 -n1 sed -i '1s/^\xEF\xBB\xBF//'
-
-name: Build debug APK (no gradlew required)
+name: Build debug APK (use JDK 17)
 
 on:
   push:
@@ -28,15 +22,37 @@ jobs:
       - name: Install SDKMAN and Gradle 7.4.2
         shell: bash
         run: |
+          # install sdkman and a specific Gradle (if you want to use system gradle)
           curl -s "https://get.sdkman.io" | bash
           source "$HOME/.sdkman/bin/sdkman-init.sh"
           sdk install gradle 7.4.2
           gradle -v
 
+      - name: Ensure Gradle wrapper preference
+        shell: bash
+        run: |
+          # prefer ./gradlew if present, otherwise use system gradle
+          if [ -x "./gradlew" ]; then
+            echo "Using project gradlew"
+            chmod +x ./gradlew
+            export GRADLE_CMD="./gradlew"
+          else
+            echo "No gradlew found — using installed gradle"
+            export GRADLE_CMD="gradle"
+          fi
+          echo "GRADLE_CMD=$GRADLE_CMD" >> $GITHUB_ENV
+
+      - name: Strip BOMs from gradle/properties (safety)
+        shell: bash
+        run: |
+          find . -type f \( -name '*.gradle' -o -name '*.properties' \) -print0 \
+          | xargs -0 -n1 sed -i '1s/^\xEF\xBB\xBF//'
+
       - name: Build debug APK
         shell: bash
         run: |
-          gradle clean assembleDebug --no-daemon --stacktrace
+          # use the selected gradle command
+          $GRADLE_CMD clean assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
