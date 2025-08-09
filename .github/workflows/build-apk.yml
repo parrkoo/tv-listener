@@ -1,4 +1,4 @@
-name: Build debug APK (force Gradle 7.4.2)
+name: Build debug APK (JDK 17 + Gradle 7.4.2)
 
 on:
   push:
@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GRADLE_VERSION: "7.4.2"
+      GRADLE_DIST_URL: "https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"
 
     steps:
       - name: Checkout repo
@@ -21,17 +22,24 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install SDKMAN and Gradle (specific)
+      - name: Download and unpack Gradle ${GRADLE_VERSION}
+        run: |
+          mkdir -p $HOME/gradle
+          curl -sSL "${{ env.GRADLE_DIST_URL }}" -o gradle.zip
+          unzip -q gradle.zip -d $HOME/gradle
+          rm gradle.zip
+          # set GRADLE_BIN to the installed gradle binary path
+          GRADLE_BIN=$(ls -d $HOME/gradle/gradle-* | head -n1)/bin/gradle
+          echo "GRADLE_BIN=$GRADLE_BIN" >> $GITHUB_ENV
+          $GRADLE_BIN --version
+
+      - name: Strip BOMs from gradle/properties (safety)
         shell: bash
         run: |
-          curl -s "https://get.sdkman.io" | bash
-          source "$HOME/.sdkman/bin/sdkman-init.sh"
-          sdk install gradle $GRADLE_VERSION
-          SDK_GRADLE="$HOME/.sdkman/candidates/gradle/$GRADLE_VERSION/bin/gradle"
-          echo "SDK_GRADLE=$SDK_GRADLE" >> $GITHUB_ENV
-          $SDK_GRADLE --version
+          find . -type f \( -name '*.gradle' -o -name '*.properties' \) -print0 \
+          | xargs -0 -n1 sed -i '1s/^\xEF\xBB\xBF//'
 
-      - name: Prefer project wrapper if present, else use SDKMAN gradle
+      - name: Choose gradle command (prefer wrapper if present)
         shell: bash
         run: |
           if [ -x "./gradlew" ]; then
@@ -39,20 +47,20 @@ jobs:
             chmod +x ./gradlew
             echo "GRADLE_CMD=./gradlew" >> $GITHUB_ENV
           else
-            echo "Using SDKMAN gradle at $SDK_GRADLE"
-            echo "GRADLE_CMD=$SDK_GRADLE" >> $GITHUB_ENV
+            echo "No gradlew found — using downloaded Gradle"
+            echo "GRADLE_CMD=${GRADLE_BIN}" >> $GITHUB_ENV
           fi
 
-      - name: Strip BOMs (safety)
-        shell: bash
+      - name: Show java / gradle info
         run: |
-          find . -type f \( -name '*.gradle' -o -name '*.properties' \) -print0 \
-          | xargs -0 -n1 sed -i '1s/^\xEF\xBB\xBF//'
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+          echo "Using gradle: $GRADLE_CMD"
+          $GRADLE_CMD --version
 
       - name: Build debug APK
-        shell: bash
         run: |
-          echo "Running: $GRADLE_CMD clean assembleDebug --no-daemon --stacktrace"
+          set -o pipefail
           $GRADLE_CMD clean assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK artifact
