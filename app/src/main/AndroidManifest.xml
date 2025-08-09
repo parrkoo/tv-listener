@@ -23,12 +23,18 @@
         <service android:name=".ListenerService"
                  android:exported="false" />
 
-        <receiver android:name=".BootReceiver">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
-                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
-            </intent-filter>
-        </receiver>
+        <!-- at top of the manifest if missing:
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+-->
+        <receiver
+         android:name=".BootReceiver"
+          android:enabled="true"
+            android:exported="true">   <!-- << required for Android 12+ when the receiver has an intent-filter -->
+    <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+    </intent-filter>
+</receiver>
+ 
 
     </application>
 
