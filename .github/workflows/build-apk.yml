@@ -1,4 +1,4 @@
-name: Build debug APK (use JDK 17)
+name: Build debug APK (force Gradle 7.4.2)
 
 on:
   push:
@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      GRADLE_VERSION: "7.4.2"
 
     steps:
       - name: Checkout repo
@@ -19,30 +21,29 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install SDKMAN and Gradle 7.4.2
+      - name: Install SDKMAN and Gradle (specific)
         shell: bash
         run: |
-          # install sdkman and a specific Gradle (if you want to use system gradle)
           curl -s "https://get.sdkman.io" | bash
           source "$HOME/.sdkman/bin/sdkman-init.sh"
-          sdk install gradle 7.4.2
-          gradle -v
+          sdk install gradle $GRADLE_VERSION
+          SDK_GRADLE="$HOME/.sdkman/candidates/gradle/$GRADLE_VERSION/bin/gradle"
+          echo "SDK_GRADLE=$SDK_GRADLE" >> $GITHUB_ENV
+          $SDK_GRADLE --version
 
-      - name: Ensure Gradle wrapper preference
+      - name: Prefer project wrapper if present, else use SDKMAN gradle
         shell: bash
         run: |
-          # prefer ./gradlew if present, otherwise use system gradle
           if [ -x "./gradlew" ]; then
             echo "Using project gradlew"
             chmod +x ./gradlew
-            export GRADLE_CMD="./gradlew"
+            echo "GRADLE_CMD=./gradlew" >> $GITHUB_ENV
           else
-            echo "No gradlew found — using installed gradle"
-            export GRADLE_CMD="gradle"
+            echo "Using SDKMAN gradle at $SDK_GRADLE"
+            echo "GRADLE_CMD=$SDK_GRADLE" >> $GITHUB_ENV
           fi
-          echo "GRADLE_CMD=$GRADLE_CMD" >> $GITHUB_ENV
 
-      - name: Strip BOMs from gradle/properties (safety)
+      - name: Strip BOMs (safety)
         shell: bash
         run: |
           find . -type f \( -name '*.gradle' -o -name '*.properties' \) -print0 \
@@ -51,7 +52,7 @@ jobs:
       - name: Build debug APK
         shell: bash
         run: |
-          # use the selected gradle command
+          echo "Running: $GRADLE_CMD clean assembleDebug --no-daemon --stacktrace"
           $GRADLE_CMD clean assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK artifact
