@@ -1,3 +1,9 @@
+- name: Strip BOMs from gradle and properties files
+  shell: bash
+  run: |
+    find . -type f \( -name '*.gradle' -o -name '*.properties' \) -print0 \
+    | xargs -0 -n1 sed -i '1s/^\xEF\xBB\xBF//'
+
 name: Build debug APK (no gradlew required)
 
 on:
